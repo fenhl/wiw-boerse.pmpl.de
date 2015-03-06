@@ -1,0 +1,16 @@
+[package]
+name = "wiw-boerse"
+version = "0.0.1"
+authors = ["Fenhl <fenhl@fenhl.net>"]
+
+[[bin]]
+name = "wiw-boerse"
+path = "src/main.rs"
+
+[dependencies]
+iron = "0.1.10"
+router = "0.0.9"
+
+# https://github.com/rust-lang/rust/issues/22432 workaround
+[profile.dev]
+debug = false
