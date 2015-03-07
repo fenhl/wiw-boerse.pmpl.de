@@ -8,8 +8,10 @@ name = "wiw-boerse"
 path = "src/main.rs"
 
 [dependencies]
-iron = "0.1.10"
-router = "0.0.9"
+iron = "*"
+lazy_static = "*"
+router = "*"
+rustc-serialize = "*"
 
 # https://github.com/rust-lang/rust/issues/22432 workaround
 [profile.dev]

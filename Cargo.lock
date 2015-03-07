@@ -3,7 +3,9 @@ name = "wiw-boerse"
 version = "0.0.1"
 dependencies = [
  "iron 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -58,6 +60,11 @@ dependencies = [
  "typemap 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 0.2.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "libc"
