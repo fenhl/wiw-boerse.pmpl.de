@@ -9,6 +9,7 @@ use std::error::Error;
 
 use iron::{headers, status};
 use iron::prelude::*;
+use iron::mime::Mime;
 use iron::typemap::TypeMap;
 use router::Router;
 
@@ -59,7 +60,7 @@ fn check_auth(req: &mut Request) -> IronResult<()> {
         }
         None => {
             let mut hs = headers::Headers::new();
-            hs.set_raw("WWW-Authenticate", vec![b"Basic realm=\"main\"".to_vec()]);
+            hs.set_raw("WWW-Authenticate", vec![b"Basic realm=\"Anmeldung fuer die WiW-Boerse\"".to_vec()]);
             Err(IronError {
                 error: Box::new(AuthError),
                 response: Response {
@@ -74,7 +75,7 @@ fn check_auth(req: &mut Request) -> IronResult<()> {
 }
 
 fn hello_world(_: &mut Request) -> IronResult<Response> {
-    Ok(Response::with((status::Ok, "Hello, world!")))
+    Ok(Response::with((status::Ok, "text/html".parse::<Mime>().unwrap(), include_str!("../assets/index.html"))))
 }
 
 fn main() {
