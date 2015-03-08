@@ -13,6 +13,9 @@ lazy_static = "*"
 router = "*"
 rustc-serialize = "*"
 
+#[dependencies.static]
+#git = "https://github.com/iron/static.git"
+
 # https://github.com/rust-lang/rust/issues/22432 workaround
 [profile.dev]
 debug = false
