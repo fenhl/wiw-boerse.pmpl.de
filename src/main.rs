@@ -102,6 +102,42 @@ fn index(_: &mut Request) -> IronResult<Response> {
             <div class="panel panel-default">
                 {intro}
             </div>
+            <div class="row">
+                <div class="col-lg-6 col-sm-12">
+                    <h2>Ich habe/biete</h2>
+                    <table class="table table-responsive">
+                        <thead>
+                            <tr>
+                                <th>Eingestellt von</th>
+                                <th>Beschreibung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td></td>
+                                <td style="color: gray; font-style: italic;">Keine aktiven Angebote.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-lg-6 col-sm-12">
+                    <h2>Wir suchen</h2>
+                    <table class="table table-responsive">
+                        <thead>
+                            <tr>
+                                <th>Eingestellt von</th>
+                                <th>Beschreibung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td></td>
+                                <td style="color: gray; font-style: italic;">Keine aktiven Anfragen.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </body>
 </html>
