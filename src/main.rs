@@ -104,7 +104,7 @@ fn index(_: &mut Request) -> IronResult<Response> {
             </div>
             <div class="row">
                 <div class="col-lg-6 col-sm-12">
-                    <h2>Ich habe/biete</h2>
+                    <h2>Ich habe/biete <a href="/biete/neu" class="btn btn-success"><i class="fa fa-plus"></i> Angebot hinzufügen</a></h2>
                     <table class="table table-responsive">
                         <thead>
                             <tr>
@@ -121,7 +121,7 @@ fn index(_: &mut Request) -> IronResult<Response> {
                     </table>
                 </div>
                 <div class="col-lg-6 col-sm-12">
-                    <h2>Wir suchen</h2>
+                    <h2>Ich suche <a href="/suche/neu" class="btn btn-success"><i class="fa fa-plus"></i> Anfrage hinzufügen</a></h2>
                     <table class="table table-responsive">
                         <thead>
                             <tr>
@@ -148,7 +148,7 @@ fn index(_: &mut Request) -> IronResult<Response> {
     ))))
 }
 
-fn logo(_: &mut Request) -> IronResult<Response> {
+fn nyi(_: &mut Request) -> IronResult<Response> {
     Err(IronError {
         error: Box::new(Nyi),
         response: Response {
@@ -164,7 +164,11 @@ fn main() {
     // route
     let mut router = Router::new();
     router.get("/", index);
-    router.get("/logo.png", logo);
+    router.get("/logo.png", nyi);
+    router.get("/suche/neu", nyi);
+    router.get("/suche/:id", nyi);
+    router.get("/biete/neu", nyi);
+    router.get("/biete/:id", nyi);
     // handle auth
     let mut chain = Chain::new(router);
     chain.link_before(check_auth);
