@@ -10,6 +10,7 @@ path = "src/main.rs"
 [dependencies]
 iron = "*"
 lazy_static = "*"
+mysql = "*"
 router = "*"
 rustc-serialize = "*"
 

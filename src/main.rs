@@ -2,58 +2,73 @@
 
 extern crate iron;
 #[macro_use] extern crate lazy_static;
+extern crate mysql;
 extern crate router;
 extern crate "rustc-serialize" as rustc_serialize;
 //extern crate static;
 
+use std::default::Default;
 use std::error::Error;
 
 use iron::{headers, status};
 use iron::prelude::*;
 use iron::mime::Mime;
 use iron::typemap::TypeMap;
+
+use mysql::conn::{MyConn, MyOpts};
+use mysql::value::FromValue;
+
 use router::Router;
 
 use rustc_serialize::json;
 
 #[derive(RustcDecodable)]
+struct ConfigMy {
+    password: String
+}
+
+#[derive(RustcDecodable)]
 struct Config {
     username: String,
-    password: String
+    password: String,
+    mysql: ConfigMy
 }
 
 lazy_static! {
     static ref CONFIG: Config = json::decode(include_str!("../assets/config.json")).unwrap();
+    static ref MY_OPTS: MyOpts = MyOpts {
+        user: Some("wiw".to_string()),
+        pass: Some(CONFIG.mysql.password.clone()),
+        db_name: Some("wiwboerse".to_string()),
+        ..Default::default()
+    };
 }
 
-#[derive(Debug)]
-struct AuthError;
+macro_rules! errors {
+    ($($name:ident($msg:expr);)*) => {
+        $(
+            #[derive(Debug)]
+            struct $name;
 
-impl std::fmt::Display for AuthError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        std::fmt::Display::fmt("authentication error", f)
+            impl std::fmt::Display for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    std::fmt::Display::fmt($msg, f)
+                }
+            }
+
+            impl Error for $name {
+                fn description(&self) -> &str {
+                    $msg
+                }
+            }
+        )*
     }
 }
 
-impl Error for AuthError {
-    fn description(&self) -> &str {
-        "authentication error"
-    }
-}
-
-#[derive(Debug)]
-struct Nyi;
-
-impl std::fmt::Display for Nyi {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        std::fmt::Display::fmt("not yet implemented", f)
-    }
-}
-
-impl Error for Nyi {
-    fn description(&self) -> &str {
-        "not yet implemented"
-    }
+errors! {
+    AuthError("authentication error");
+    DbError("database error");
+    Nyi("not yet implemented");
 }
 
 fn check_auth(req: &mut Request) -> IronResult<()> {
@@ -90,8 +105,56 @@ fn check_auth(req: &mut Request) -> IronResult<()> {
     }
 }
 
+fn format_offers(conn: &mut mysql::conn::MyConn) -> String {
+    let offers = conn.query("SELECT * FROM offers").collect::<Vec<_>>();
+    if offers.len() > 0 {
+        offers.into_iter().map(|row| match row {
+            Ok(values) => {
+                // name, description, phone, mail
+                format!(
+                    r#"
+<tr>
+    <td>{name}</td>
+    <td>{description}</td>
+</tr>
+                    "#,
+                    name=String::from_value(&values[0]),
+                    description=String::from_value(&values[1])
+                )
+            }
+            Err(_) => format!(
+                r#"
+<tr>
+    <td></td>
+    <td style="color: gray; font-style: italic;">Fehlerhaftes Angebot.</td>
+</tr>
+                "#
+            )
+        }).fold("".to_string(), |text, row| text + &row)
+    } else {
+        format!(r#"
+<tr>
+    <td></td>
+    <td style="color: gray; font-style: italic;">Keine aktiven Angebote.</td>
+</tr>
+        "#)
+    }
+}
+
+fn format_requests(conn: &mut mysql::conn::MyConn) -> String {
+    format!(r#"
+<tr>
+    <td></td>
+    <td style="color: gray; font-style: italic;">Keine aktiven Anfragen.</td>
+</tr>
+    "#)
+}
+
 fn index(_: &mut Request) -> IronResult<Response> {
-    Ok(Response::with((status::Ok, "text/html".parse::<Mime>().unwrap(), format!(r#"<!DOCTYPE html>
+    let mut conn = try!(MyConn::new(MY_OPTS.clone()).map_err(|_| IronError::new(DbError, (status::InternalServerError, "Konnte die Datenbank nicht laden. Bitte kontaktieren Sie die Administration."))));
+    Ok(Response::with((status::Ok, "text/html".parse::<Mime>().unwrap(), format!(
+        r#"
+<!DOCTYPE html>
 <html>
     <head>
         {header}
@@ -113,10 +176,7 @@ fn index(_: &mut Request) -> IronResult<Response> {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td></td>
-                                <td style="color: gray; font-style: italic;">Keine aktiven Angebote.</td>
-                            </tr>
+                            {offers}
                         </tbody>
                     </table>
                 </div>
@@ -130,10 +190,7 @@ fn index(_: &mut Request) -> IronResult<Response> {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td></td>
-                                <td style="color: gray; font-style: italic;">Keine aktiven Anfragen.</td>
-                            </tr>
+                            {requests}
                         </tbody>
                     </table>
                 </div>
@@ -141,10 +198,12 @@ fn index(_: &mut Request) -> IronResult<Response> {
         </div>
     </body>
 </html>
-"#,
+        "#,
         header=include_str!("../assets/header.html"),
         intro=include_str!("../assets/intro.html"),
-        nav=include_str!("../assets/nav.html")
+        nav=include_str!("../assets/nav.html"),
+        offers=format_offers(&mut conn),
+        requests=format_requests(&mut conn)
     ))))
 }
 
