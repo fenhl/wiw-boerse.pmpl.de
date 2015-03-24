@@ -120,8 +120,8 @@ fn format_offers(conn: &mut mysql::conn::MyConn) -> String {
                     "#,
                     name=String::from_value(&values[0]),
                     description=String::from_value(&values[1]),
-                    phone=match Option::<String>::from_value(&values[2]) { Some(phone) => &format!(r#"<br /><a href="tel:{0}">{0}</a>"#, phone), None => "" },
-                    mail=match Option::<String>::from_value(&values[3]) { Some(mail) => &format!(r#"<br /><a href="mailto:{0}">{0}</a>"#, mail), None => "" },
+                    phone=match Option::<String>::from_value(&values[2]) { Some(phone) => format!(r#"<br /><a href="tel:{0}">{0}</a>"#, phone), None => "".to_string() },
+                    mail=match Option::<String>::from_value(&values[3]) { Some(mail) => format!(r#"<br /><a href="mailto:{0}">{0}</a>"#, mail), None => "".to_string() },
                 )
             }
             Err(_) => format!(
