@@ -1,10 +1,8 @@
-#![feature(core)]
-
 extern crate iron;
 #[macro_use] extern crate lazy_static;
 extern crate mysql;
 extern crate router;
-extern crate "rustc-serialize" as rustc_serialize;
+extern crate rustc_serialize as rustc_serialize;
 //extern crate static;
 
 use std::default::Default;
@@ -16,6 +14,7 @@ use iron::mime::Mime;
 use iron::typemap::TypeMap;
 
 use mysql::conn::{MyConn, MyOpts};
+use mysql::error::MyError;
 use mysql::value::FromValue;
 
 use router::Router;
@@ -77,17 +76,11 @@ fn check_auth(req: &mut Request) -> IronResult<()> {
             if *username == CONFIG.username && *password == CONFIG.password {
                 Ok(())
             } else {
-                Err(IronError {
-                    error: Box::new(AuthError),
-                    response: Response::with((status::Unauthorized, "Benutzername oder Passwort falsch."))
-                })
+                Err(IronError::new(AuthError, (status::Unauthorized, "Benutzername oder Passwort falsch.")))
             }
         }
         Some(&headers::Authorization(headers::Basic { username: _, password: None })) => {
-            Err(IronError {
-                error: Box::new(AuthError),
-                response: Response::with((status::Unauthorized, "Kein Passwort gefunden."))
-            })
+            Err(IronError::new(AuthError, (status::Unauthorized, "Kein Passwort gefunden.")))
         }
         None => {
             let mut hs = headers::Headers::new();
@@ -105,9 +98,9 @@ fn check_auth(req: &mut Request) -> IronResult<()> {
     }
 }
 
-fn format_offers(conn: &mut mysql::conn::MyConn) -> String {
-    let offers = conn.query("SELECT * FROM offers").collect::<Vec<_>>();
-    if offers.len() > 0 {
+fn format_offers(conn: &mut mysql::conn::MyConn) -> Result<String, MyError> {
+    let offers = try!(conn.query("SELECT * FROM offers")).collect::<Vec<_>>();
+    Ok(if offers.len() > 0 {
         offers.into_iter().map(|row| match row {
             Ok(values) => {
                 // name, description, phone, mail
@@ -140,16 +133,45 @@ fn format_offers(conn: &mut mysql::conn::MyConn) -> String {
     <td style="color: gray; font-style: italic;">Keine aktiven Angebote.</td>
 </tr>
         "#)
-    }
+    })
 }
 
-fn format_requests(conn: &mut mysql::conn::MyConn) -> String {
-    format!(r#"
+fn format_requests(conn: &mut mysql::conn::MyConn) -> Result<String, MyError> {
+    let requests = try!(conn.query("SELECT * FROM requests")).collect::<Vec<_>>();
+    Ok(if requests.len() > 0 {
+        requests.into_iter().map(|row| match row {
+            Ok(values) => {
+                // name, description, phone, mail
+                format!(
+                    r#"
+<tr>
+    <td>{name}{mail}{phone}</td>
+    <td>{description}</td>
+</tr>
+                    "#,
+                    name=String::from_value(&values[0]),
+                    description=String::from_value(&values[1]),
+                    phone=match Option::<String>::from_value(&values[2]) { Some(phone) => format!(r#"<br /><a href="tel:{0}">{0}</a>"#, phone), None => "".to_string() },
+                    mail=match Option::<String>::from_value(&values[3]) { Some(mail) => format!(r#"<br /><a href="mailto:{0}">{0}</a>"#, mail), None => "".to_string() },
+                )
+            }
+            Err(_) => format!(
+                r#"
+<tr>
+    <td></td>
+    <td style="color: gray; font-style: italic;">Fehlerhafte Anfrage.</td>
+</tr>
+                "#
+            )
+        }).fold("".to_string(), |text, row| text + &row)
+    } else {
+        format!(r#"
 <tr>
     <td></td>
     <td style="color: gray; font-style: italic;">Keine aktiven Anfragen.</td>
 </tr>
-    "#)
+        "#)
+    })
 }
 
 fn index(_: &mut Request) -> IronResult<Response> {
@@ -204,21 +226,13 @@ fn index(_: &mut Request) -> IronResult<Response> {
         header=include_str!("../assets/header.html"),
         intro=include_str!("../assets/intro.html"),
         nav=include_str!("../assets/nav.html"),
-        offers=format_offers(&mut conn),
-        requests=format_requests(&mut conn)
+        offers=try!(format_offers(&mut conn).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
+        requests=try!(format_requests(&mut conn).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))))
     ))))
 }
 
 fn nyi(_: &mut Request) -> IronResult<Response> {
-    Err(IronError {
-        error: Box::new(Nyi),
-        response: Response {
-            status: Some(status::NotImplemented),
-            headers: headers::Headers::new(),
-            extensions: TypeMap::new(),
-            body: None
-        }
-    })
+    Err(IronError::new(Nyi, (status::NotImplemented, "Diese Seite ist noch nicht verfügbar, bitte versuchen Sie es später erneut.")))
 }
 
 fn main() {
