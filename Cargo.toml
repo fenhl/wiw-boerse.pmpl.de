@@ -14,8 +14,13 @@ bench = false
 iron = "*"
 lazy_static = "*"
 mysql = "*"
+regex = "*"
+regex_macros = "*"
 router = "*"
 rustc-serialize = "*"
 
 #[dependencies.static]
 #git = "https://github.com/iron/static.git"
+
+[dependencies.urlencoded]
+git = "https://github.com/iron/urlencoded.git" # crates.io version is outdated

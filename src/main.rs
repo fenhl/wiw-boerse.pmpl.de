@@ -1,9 +1,14 @@
+#![feature(plugin)]
+#![plugin(regex_macros)]
+
 extern crate iron;
 #[macro_use] extern crate lazy_static;
 extern crate mysql;
+extern crate regex;
 extern crate router;
 extern crate rustc_serialize as rustc_serialize;
 //extern crate static;
+extern crate urlencoded;
 
 use std::default::Default;
 use std::error::Error;
@@ -20,6 +25,8 @@ use mysql::value::FromValue;
 use router::Router;
 
 use rustc_serialize::json;
+
+use urlencoded::UrlEncodedBody;
 
 #[derive(RustcDecodable)]
 struct ConfigMy {
@@ -96,6 +103,14 @@ fn check_auth(req: &mut Request) -> IronResult<()> {
             })
         }
     }
+}
+
+fn mysql_escape<S: AsRef<str>>(s: S) -> String {
+    regex!("\0|\n|\r|\\|'|\"|\x1a").replace_all(s.as_ref(), "\\$0")
+}
+
+fn mysql_connection() -> IronResult<MyConn> {
+    MyConn::new(MY_OPTS.clone()).map_err(|_| IronError::new(DbError, (status::InternalServerError, "Konnte die Datenbank nicht laden. Bitte kontaktieren Sie die Administration.")))
 }
 
 fn format_offers(conn: &mut mysql::conn::MyConn) -> Result<String, MyError> {
@@ -175,7 +190,7 @@ fn format_requests(conn: &mut mysql::conn::MyConn) -> Result<String, MyError> {
 }
 
 fn index(_: &mut Request) -> IronResult<Response> {
-    let mut conn = try!(MyConn::new(MY_OPTS.clone()).map_err(|_| IronError::new(DbError, (status::InternalServerError, "Konnte die Datenbank nicht laden. Bitte kontaktieren Sie die Administration."))));
+    let mut conn = try!(mysql_connection());
     Ok(Response::with((status::Ok, "text/html".parse::<Mime>().unwrap(), format!(
         r#"
 <!DOCTYPE html>
@@ -231,19 +246,92 @@ fn index(_: &mut Request) -> IronResult<Response> {
     ))))
 }
 
-fn nyi(_: &mut Request) -> IronResult<Response> {
-    Err(IronError::new(Nyi, (status::NotImplemented, "Diese Seite ist noch nicht verfügbar, bitte versuchen Sie es später erneut.")))
+fn new_offer_page(_: &mut Request) -> IronResult<Response> {
+    Ok(Response::with((status::Ok, "text/html".parse::<Mime>().unwrap(), format!(
+        r#"
+<!DOCTYPE html>
+<html>
+    <head>
+        {header}
+    </head>
+    <body>
+        {nav}
+        <div class="container" style="position: relative; top: 71px;">
+            <form class="form-horizontal" action="/biete/neu" method="post" enctype="application/x-www-form-urlencoded">
+                <div class="form-group">
+                    <label for="name" class="col-sm-2 control-label">Eingestellt von</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="name" id="name" placeholder="Ihr Name" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="mail" class="col-sm-2 control-label">E-Mail</label>
+                    <div class="col-sm-10">
+                        <input type="email" class="form-control" name="mail" id="mail" placeholder="Eine Mailadresse zur Kontaktaufnahme. Wird in der Liste angezeigt." />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="phone" class="col-sm-2 control-label">Telefon</label>
+                    <div class="col-sm-10">
+                        <input type="tel" class="form-control" name="phone" id="phone" placeholder="Eine Telefonnummer zur Kontaktaufnahme. Wird in der Liste angezeigt." />
+                        <p class="help-block">Bitte geben Sie Mailadresse und/oder Telefonnummer an.</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="description" class="col-sm-2 control-label">Beschreibung</label>
+                    <div class="col-sm-10">
+                        <textarea rows="3" class="form-control" name="description" id="description" placeholder="Beschreiben Sie das Angebot hier."></textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-sm-offset-2 col-sm-10">
+                        <button type="submit" class="btn btn-primary">Angebot einreichen</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </body>
+</html>
+        "#,
+        header=include_str!("../assets/header.html"),
+        nav=include_str!("../assets/nav.html")
+    ))))
+}
+
+fn add_offer(req: &mut Request) -> IronResult<Response> {
+    let form_data = try!(req.get_ref::<UrlEncodedBody>().map_err(|e| IronError::new(e, (status::BadRequest, "Fehlender Formularinhalt. Bitte füllen Sie das Formular erneut aus."))));
+    let name = mysql_escape(&form_data["name"][0]);
+    if name.len() == 0 { return Err(nyi()) }
+    let description = mysql_escape(&form_data["description"][0]);
+    if description.len() == 0 { return Err(nyi()) }
+    let phone = mysql_escape(&form_data["phone"][0]);
+    let mail = mysql_escape(&form_data["mail"][0]);
+    if phone.len() == 0 && mail.len() == 0 { return Err(nyi()) }
+    let mut conn = try!(mysql_connection());
+    let response = try!(conn.query(format!("INSERT INTO offers (name, description, phone, mail) VALUES ({}, {}, {}, {})", mysql_escape(name), mysql_escape(description), mysql_escape(phone), mysql_escape(mail))).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))).collect::<Vec<_>>();
+    Ok(Response::with((status::NotImplemented, format!("Diese Seite befindet sich im Aufbau.\nTest:\n{:?}", response))))
+    // Ok(Response::with((status::Ok, "Ihr Angebot wurde eingetragen.")))
+}
+
+fn nyi() -> IronError {
+    IronError::new(Nyi, (status::NotImplemented, "Diese Seite ist noch nicht verfügbar, bitte versuchen Sie es später erneut."))
+}
+
+fn nyi_handler(_: &mut Request) -> IronResult<Response> {
+    Err(nyi())
 }
 
 fn main() {
     // route
     let mut router = Router::new();
     router.get("/", index);
-    router.get("/logo.png", nyi);
-    router.get("/suche/neu", nyi);
-    router.get("/suche/:id", nyi);
-    router.get("/biete/neu", nyi);
-    router.get("/biete/:id", nyi);
+    router.get("/logo.png", nyi_handler);
+    router.get("/suche/neu", nyi_handler);
+    router.post("/suche/neu", nyi_handler);
+    router.get("/suche/:id", nyi_handler);
+    router.get("/biete/neu", new_offer_page);
+    router.post("/biete/neu", add_offer);
+    router.get("/biete/:id", nyi_handler);
     // handle auth
     let mut chain = Chain::new(router);
     chain.link_before(check_auth);
