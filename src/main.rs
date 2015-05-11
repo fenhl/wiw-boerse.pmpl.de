@@ -316,7 +316,7 @@ fn add_offer(req: &mut Request) -> IronResult<Response> {
     let mail = mysql_escape_nullable(&form_data["mail"][0]);
     if phone == "NULL" && mail == "NULL" { return Err(nyi()) }
     let mut conn = try!(mysql_connection());
-    let response = try!(conn.query(format!("INSERT INTO offers (name, description, phone, mail) VALUES ({}, {}, {}, {})", name, description, phone, mail)).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))).collect::<Vec<_>>();
+    try!(conn.query(format!("INSERT INTO offers (name, description, phone, mail) VALUES ({}, {}, {}, {})", name, description, phone, mail)).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))));
     Ok(Response::with((status::Ok, "Ihr Angebot wurde eingetragen.")))
 }
 
