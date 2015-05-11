@@ -308,7 +308,7 @@ fn add_offer(req: &mut Request) -> IronResult<Response> {
     let mail = mysql_escape(&form_data["mail"][0]);
     if phone.len() == 0 && mail.len() == 0 { return Err(nyi()) }
     let mut conn = try!(mysql_connection());
-    let response = try!(conn.query(format!("INSERT INTO offers (name, description, phone, mail) VALUES ({}, {}, {}, {})", mysql_escape(name), mysql_escape(description), mysql_escape(phone), mysql_escape(mail))).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))).collect::<Vec<_>>();
+    let response = try!(conn.query(format!("INSERT INTO offers (name, description, phone, mail) VALUES (\"{}\", \"{}\", \"{}\", \"{}\")", mysql_escape(name), mysql_escape(description), mysql_escape(phone), mysql_escape(mail))).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))).collect::<Vec<_>>();
     Ok(Response::with((status::NotImplemented, format!("Diese Seite befindet sich im Aufbau.\nTest:\n{:?}", response))))
     // Ok(Response::with((status::Ok, "Ihr Angebot wurde eingetragen.")))
 }
