@@ -265,6 +265,7 @@ fn new_offer_page(_: &mut Request) -> IronResult<Response> {
     <body>
         {nav}
         <div class="container" style="position: relative; top: 71px;">
+            <h2>Neues Angebot</h2>
             <form class="form-horizontal" action="/biete/neu" method="post" enctype="application/x-www-form-urlencoded">
                 <div class="form-group">
                     <label for="name" class="col-sm-2 control-label">Eingestellt von</label>
@@ -320,6 +321,73 @@ fn add_offer(req: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok, "Ihr Angebot wurde eingetragen.")))
 }
 
+fn new_request_page(_: &mut Request) -> IronResult<Response> {
+    Ok(Response::with((status::Ok, "text/html".parse::<Mime>().unwrap(), format!(
+        r#"
+<!DOCTYPE html>
+<html>
+    <head>
+        {header}
+    </head>
+    <body>
+        {nav}
+        <div class="container" style="position: relative; top: 71px;">
+            <h2>Neue Anfrage</h2>
+            <form class="form-horizontal" action="/suche/neu" method="post" enctype="application/x-www-form-urlencoded">
+                <div class="form-group">
+                    <label for="name" class="col-sm-2 control-label">Eingestellt von</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="name" id="name" placeholder="Ihr Name" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="mail" class="col-sm-2 control-label">E-Mail</label>
+                    <div class="col-sm-10">
+                        <input type="email" class="form-control" name="mail" id="mail" placeholder="Eine Mailadresse zur Kontaktaufnahme. Wird in der Liste angezeigt." />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="phone" class="col-sm-2 control-label">Telefon</label>
+                    <div class="col-sm-10">
+                        <input type="tel" class="form-control" name="phone" id="phone" placeholder="Eine Telefonnummer zur Kontaktaufnahme. Wird in der Liste angezeigt." />
+                        <p class="help-block">Bitte geben Sie Mailadresse und/oder Telefonnummer an.</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="description" class="col-sm-2 control-label">Beschreibung</label>
+                    <div class="col-sm-10">
+                        <textarea rows="3" class="form-control" name="description" id="description" placeholder="Beschreiben Sie die Anfrage hier."></textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-sm-offset-2 col-sm-10">
+                        <button type="submit" class="btn btn-primary">Anfrage einreichen</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </body>
+</html>
+        "#,
+        header=include_str!("../assets/header.html"),
+        nav=include_str!("../assets/nav.html")
+    ))))
+}
+
+fn add_request(req: &mut Request) -> IronResult<Response> {
+    let form_data = try!(req.get_ref::<UrlEncodedBody>().map_err(|e| IronError::new(e, (status::BadRequest, "Fehlender Formularinhalt. Bitte füllen Sie das Formular erneut aus."))));
+    let name = mysql_escape(&form_data["name"][0]);
+    if name.len() == 0 { return Err(nyi()) }
+    let description = mysql_escape(&form_data["description"][0]);
+    if description.len() == 0 { return Err(nyi()) }
+    let phone = mysql_escape_nullable(&form_data["phone"][0]);
+    let mail = mysql_escape_nullable(&form_data["mail"][0]);
+    if phone == "NULL" && mail == "NULL" { return Err(nyi()) }
+    let mut conn = try!(mysql_connection());
+    try!(conn.query(format!("INSERT INTO requests (name, description, phone, mail) VALUES ({}, {}, {}, {})", name, description, phone, mail)).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))));
+    Ok(Response::with((status::Ok, "Ihre Anfrage wurde eingetragen.")))
+}
+
 fn nyi() -> IronError {
     IronError::new(Nyi, (status::NotImplemented, "Diese Seite ist noch nicht verfügbar, bitte versuchen Sie es später erneut."))
 }
@@ -333,8 +401,8 @@ fn main() {
     let mut router = Router::new();
     router.get("/", index);
     router.get("/logo.png", nyi_handler);
-    router.get("/suche/neu", nyi_handler);
-    router.post("/suche/neu", nyi_handler);
+    router.get("/suche/neu", new_request_page);
+    router.post("/suche/neu", add_request);
     router.get("/suche/:id", nyi_handler);
     router.get("/biete/neu", new_offer_page);
     router.post("/biete/neu", add_offer);
