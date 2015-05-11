@@ -106,7 +106,15 @@ fn check_auth(req: &mut Request) -> IronResult<()> {
 }
 
 fn mysql_escape<S: AsRef<str>>(s: S) -> String {
-    regex!("\0|\n|\r|\\|'|\"|\x1a").replace_all(s.as_ref(), "\\$0")
+    format!("\"{}\"", regex!("\0|\n|\r|\\|'|\"|\x1a").replace_all(s.as_ref(), "\\$0"))
+}
+
+fn mysql_escape_nullable<S: AsRef<str>>(s: S) -> String {
+    if s.as_ref() == "" {
+        "NULL".to_owned()
+    } else {
+        mysql_escape(s)
+    }
 }
 
 fn mysql_connection() -> IronResult<MyConn> {
@@ -304,13 +312,12 @@ fn add_offer(req: &mut Request) -> IronResult<Response> {
     if name.len() == 0 { return Err(nyi()) }
     let description = mysql_escape(&form_data["description"][0]);
     if description.len() == 0 { return Err(nyi()) }
-    let phone = mysql_escape(&form_data["phone"][0]);
-    let mail = mysql_escape(&form_data["mail"][0]);
-    if phone.len() == 0 && mail.len() == 0 { return Err(nyi()) }
+    let phone = mysql_escape_nullable(&form_data["phone"][0]);
+    let mail = mysql_escape_nullable(&form_data["mail"][0]);
+    if phone == "NULL" && mail == "NULL" { return Err(nyi()) }
     let mut conn = try!(mysql_connection());
-    let response = try!(conn.query(format!("INSERT INTO offers (name, description, phone, mail) VALUES (\"{}\", \"{}\", \"{}\", \"{}\")", mysql_escape(name), mysql_escape(description), mysql_escape(phone), mysql_escape(mail))).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))).collect::<Vec<_>>();
-    Ok(Response::with((status::NotImplemented, format!("Diese Seite befindet sich im Aufbau.\nTest:\n{:?}", response))))
-    // Ok(Response::with((status::Ok, "Ihr Angebot wurde eingetragen.")))
+    let response = try!(conn.query(format!("INSERT INTO offers (name, description, phone, mail) VALUES ({}, {}, {}, {})", name, description, phone, mail)).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))).collect::<Vec<_>>();
+    Ok(Response::with((status::Ok, "Ihr Angebot wurde eingetragen.")))
 }
 
 fn nyi() -> IronError {
