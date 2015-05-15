@@ -113,5 +113,6 @@ macro_rules! errors {
 errors! {
     AuthError("authentication error");
     DbError("database error");
+    InternalError("internal server error");
     Nyi("not yet implemented");
 }

@@ -14,6 +14,8 @@ extern crate urlencoded;
 mod admin;
 mod util;
 
+use std::str::FromStr;
+
 use iron::status;
 use iron::prelude::*;
 use iron::mime::Mime;
@@ -27,7 +29,7 @@ use router::Router;
 use urlencoded::UrlEncodedBody;
 
 use admin::IsAdmin;
-use util::{DbError, MY_OPTS, Nyi, check_admin_auth, check_auth};
+use util::{DbError, InternalError, MY_OPTS, Nyi, check_admin_auth, check_auth};
 
 fn mysql_escape<S: AsRef<str>>(s: S) -> String {
     format!("\"{}\"", regex!("\0|\n|\r|\\|'|\"|\x1a").replace_all(s.as_ref(), "\\$0"))
@@ -315,6 +317,22 @@ fn add_request(req: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok, "Ihre Anfrage wurde eingetragen.")))
 }
 
+fn del_offer(req: &mut Request) -> IronResult<Response> {
+    let mut conn = try!(mysql_connection());
+    let id_str = try!(try!(req.extensions.get::<Router>().ok_or(IronError::new(InternalError, (status::InternalServerError, "Fehler beim Lesen der Angebotsnummer.")))).find("id").ok_or(IronError::new(InternalError, (status::InternalServerError, "Fehler beim Lesen der Angebotsnummer."))));
+    let id = try!(i32::from_str(id_str).map_err(|e| IronError::new(e, (status::BadRequest, format!("Die Angebotsnummer {:?} ist keine Nummer.", id_str)))));
+    try!(conn.query(format!("DELETE FROM offers WHERE id={}", id)).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))));
+    Ok(Response::with((status::Ok, "Das Angebot wurde gelöscht.")))
+}
+
+fn del_request(req: &mut Request) -> IronResult<Response> {
+    let mut conn = try!(mysql_connection());
+    let id_str = try!(try!(req.extensions.get::<Router>().ok_or(IronError::new(InternalError, (status::InternalServerError, "Fehler beim Lesen der Anfragennummer.")))).find("id").ok_or(IronError::new(InternalError, (status::InternalServerError, "Fehler beim Lesen der Anfragennummer."))));
+    let id = try!(i32::from_str(id_str).map_err(|e| IronError::new(e, (status::BadRequest, format!("Die Anfragennummer {:?} ist keine Nummer.", id_str)))));
+    try!(conn.query(format!("DELETE FROM requests WHERE id={}", id)).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))));
+    Ok(Response::with((status::Ok, "Die Anfrage wurde gelöscht.")))
+}
+
 fn nyi() -> IronError {
     IronError::new(Nyi, (status::NotImplemented, "Diese Seite ist noch nicht verfügbar, bitte versuchen Sie es später erneut."))
 }
@@ -335,10 +353,10 @@ fn main() {
     router.post("/biete/neu", add_offer);
     router.get("/biete/:id", nyi_handler);
     // handle admin auth
-    let mut del_request_chain = Chain::new(nyi_handler);
+    let mut del_request_chain = Chain::new(del_request);
     del_request_chain.link_before(check_admin_auth);
     router.get("/suche/:id/loeschen", del_request_chain);
-    let mut del_offer_chain = Chain::new(nyi_handler);
+    let mut del_offer_chain = Chain::new(del_offer);
     del_offer_chain.link_before(check_admin_auth);
     router.get("/biete/:id/loeschen", del_offer_chain);
     // handle auth
