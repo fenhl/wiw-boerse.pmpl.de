@@ -60,11 +60,11 @@ fn format_offers(conn: &mut mysql::conn::MyConn, is_admin: bool) -> Result<Strin
     <td>{edit_buttons}{description}</td>
 </tr>
                     "#,
-                    name=String::from_value(&values[0]),
-                    description=String::from_value(&values[1]).replace("\n", "<br />"),
-                    phone=match Option::<String>::from_value(&values[2]) { Some(phone) => format!(r#"<br /><a href="tel:{0}">{0}</a>"#, phone), None => "".to_owned() },
-                    mail=match Option::<String>::from_value(&values[3]) { Some(mail) => format!(r#"<br /><a href="mailto:{0}">{0}</a>"#, mail), None => "".to_owned() },
-                    edit_buttons=if is_admin { match Option::<i32>::from_value(&values[4]) { Some(i) => format!(r#"<div style="float: right;"><a href="/biete/{}/loeschen" class="btn btn-danger"><i class="fa fa-trash-o"></i></a></div>"#, i), None => "".to_owned() } } else { "".to_owned() }
+                    name=String::from_value(values[0].clone()),
+                    description=String::from_value(values[1].clone()).replace("\n", "<br />"),
+                    phone=match Option::<String>::from_value(values[2].clone()) { Some(phone) => format!(r#"<br /><a href="tel:{0}">{0}</a>"#, phone), None => "".to_owned() },
+                    mail=match Option::<String>::from_value(values[3].clone()) { Some(mail) => format!(r#"<br /><a href="mailto:{0}">{0}</a>"#, mail), None => "".to_owned() },
+                    edit_buttons=if is_admin { match Option::<i32>::from_value(values[4].clone()) { Some(i) => format!(r#"<div style="float: right;"><a href="/biete/{}/loeschen" class="btn btn-danger"><i class="fa fa-trash-o"></i></a></div>"#, i), None => "".to_owned() } } else { "".to_owned() }
                 )
             }
             Err(_) => format!(
@@ -99,11 +99,11 @@ fn format_requests(conn: &mut mysql::conn::MyConn, is_admin: bool) -> Result<Str
     <td>{edit_buttons}{description}</td>
 </tr>
                     "#,
-                    name=String::from_value(&values[0]),
-                    description=String::from_value(&values[1]).replace("\n", "<br />"),
-                    phone=match Option::<String>::from_value(&values[2]) { Some(phone) => format!(r#"<br /><a href="tel:{0}">{0}</a>"#, phone), None => "".to_owned() },
-                    mail=match Option::<String>::from_value(&values[3]) { Some(mail) => format!(r#"<br /><a href="mailto:{0}">{0}</a>"#, mail), None => "".to_owned() },
-                    edit_buttons=if is_admin { match Option::<i32>::from_value(&values[4]) { Some(i) => format!(r#"<div style="float: right;"><a href="/suche/{}/loeschen" class="btn btn-danger"><i class="fa fa-trash-o"></i></a></div>"#, i), None => "".to_owned() } } else { "".to_owned() }
+                    name=String::from_value(values[0].clone()),
+                    description=String::from_value(values[1].clone()).replace("\n", "<br />"),
+                    phone=match Option::<String>::from_value(values[2].clone()) { Some(phone) => format!(r#"<br /><a href="tel:{0}">{0}</a>"#, phone), None => "".to_owned() },
+                    mail=match Option::<String>::from_value(values[3].clone()) { Some(mail) => format!(r#"<br /><a href="mailto:{0}">{0}</a>"#, mail), None => "".to_owned() },
+                    edit_buttons=if is_admin { match Option::<i32>::from_value(values[4].clone()) { Some(i) => format!(r#"<div style="float: right;"><a href="/suche/{}/loeschen" class="btn btn-danger"><i class="fa fa-trash-o"></i></a></div>"#, i), None => "".to_owned() } } else { "".to_owned() }
                 )
             }
             Err(_) => format!(
