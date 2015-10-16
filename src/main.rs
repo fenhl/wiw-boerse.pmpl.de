@@ -1,6 +1,3 @@
-#![feature(plugin)]
-#![plugin(regex_macros)]
-
 extern crate iron;
 #[macro_use] extern crate lazy_static;
 extern crate mysql;
@@ -24,6 +21,8 @@ use mysql::conn::MyConn;
 use mysql::error::MyError;
 use mysql::value::FromValue;
 
+use regex::Regex;
+
 use router::Router;
 
 use urlencoded::UrlEncodedBody;
@@ -32,7 +31,7 @@ use admin::IsAdmin;
 use util::{DbError, InternalError, MY_OPTS, Nyi, check_admin_auth, check_auth};
 
 fn mysql_escape<S: AsRef<str>>(s: S) -> String {
-    format!("\"{}\"", regex!("\0|\n|\r|\\|'|\"|\x1a").replace_all(s.as_ref(), "\\$0"))
+    format!("\"{}\"", Regex::new("\0|\n|\r|\\|'|\"|\x1a").unwrap().replace_all(s.as_ref(), "\\$0"))
 }
 
 fn mysql_escape_nullable<S: AsRef<str>>(s: S) -> String {
