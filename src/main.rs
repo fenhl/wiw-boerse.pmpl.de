@@ -211,10 +211,10 @@ fn new_request_page(req: &mut Request) -> IronResult<Response> {
 
 fn add_entry(entry_type: entry::Type, req: &mut Request) -> Result<Response, &'static str> {
     let form_data = try!(req.get_ref::<UrlEncodedBody>().map_err(|_| "Fehlender Formularinhalt."));
-    let name = mysql_escape(&form_data["name"][0]);
-    if name.len() == 0 { return Err("Fehlender Name.") }
-    let description = mysql_escape(&form_data["description"][0]);
-    if description.len() == 0 { return Err("Fehlende Beschreibung.") }
+    let name = mysql_escape_nullable(&form_data["name"][0]);
+    if name == "NULL" { return Err("Fehlender Name.") }
+    let description = mysql_escape_nullable(&form_data["description"][0]);
+    if description == "NULL" { return Err("Fehlende Beschreibung.") }
     let phone = mysql_escape_nullable(&form_data["phone"][0]);
     let mail = mysql_escape_nullable(&form_data["mail"][0]);
     if phone == "NULL" && mail == "NULL" { return Err("Bitte geben Sie eine Telefonnummer oder Mailadresse an.") }
