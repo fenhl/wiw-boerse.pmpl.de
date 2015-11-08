@@ -183,6 +183,7 @@ fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, _: 
             </div>
             <div class="form-group">
                 <div class="col-sm-offset-2 col-sm-10">
+                    <a href="/" style="float: right;" class="btn btn-danger">Abbrechen</a>
                     <button type="submit" class="btn btn-primary">{entry_type} einreichen</button>
                 </div>
             </div>
