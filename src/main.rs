@@ -5,13 +5,14 @@ extern crate plugin;
 extern crate regex;
 extern crate router;
 extern crate rustc_serialize as rustc_serialize;
-//extern crate static;
+extern crate staticfile;
 extern crate urlencoded;
 
 mod admin;
 mod entry;
 mod util;
 
+use std::path::Path;
 use std::str::FromStr;
 
 use iron::status;
@@ -25,6 +26,8 @@ use mysql::value::FromValue;
 use regex::Regex;
 
 use router::Router;
+
+use staticfile::Static;
 
 use urlencoded::UrlEncodedBody;
 
@@ -271,7 +274,7 @@ fn main() {
     // route
     let mut router = Router::new();
     router.get("/", index);
-    router.get("/logo.png", nyi_handler);
+    router.get("/static", Static::new(Path::new("static")));
     router.get("/biete/neu", new_offer_page);
     router.post("/biete/neu", add_offer);
     router.get("/biete/:id", nyi_handler);

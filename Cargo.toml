@@ -18,7 +18,5 @@ plugin = "*"
 regex = "*"
 router = "*"
 rustc-serialize = "*"
+staticfile = "*"
 urlencoded = "*"
-
-#[dependencies.static]
-#git = "https://github.com/iron/static.git"
