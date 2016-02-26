@@ -50,6 +50,18 @@ fn mysql_connection() -> IronResult<MyConn> {
     MyConn::new(MY_OPTS.clone()).map_err(|_| IronError::new(DbError, (status::InternalServerError, "Konnte die Datenbank nicht laden. Bitte kontaktieren Sie die Administration.")))
 }
 
+fn format_notices(entry_type: Option<entry::Type>, conn: &mut mysql::conn::MyConn, is_admin: bool) -> Result<String, MyError> {
+    let entries = try!(conn.query("SELECT * FROM notices")).collect::<Vec<_>>();
+    Ok(entries.into_iter().filter_map(|row| match row {
+        //TODO filter by message position
+        Ok(values) => {
+            //TODO show delete button if is_admin
+            Some(format!(r#"<div class="alert alert-info">{}</div>"#, String::from_value(values[2].clone())))
+        }
+        Err(_) => Some(r#"<div class="alert alert-danger"><strong>Fehlerhafte Nachricht.</strong></div>"#.to_owned())
+    }).collect())
+}
+
 fn format_entries(entry_type: entry::Type, conn: &mut mysql::conn::MyConn, is_admin: bool) -> Result<String, MyError> {
     let entries = try!(conn.query(format!("SELECT * FROM {}", entry_type.table()))).collect::<Vec<_>>();
     Ok(if entries.len() > 0 {
@@ -100,6 +112,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
     <body>
         {nav}
         <div class="container" style="position: relative; top: 71px;">
+            {notices}
             <div class="panel panel-default">
                 {intro}
             </div>
@@ -140,12 +153,15 @@ fn index(req: &mut Request) -> IronResult<Response> {
         header=include_str!("../assets/header.html"),
         intro=include_str!("../assets/intro.html"),
         nav=include_str!("../assets/nav.html"),
+        notices=try!(format_notices(None, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         offers=try!(format_entries(entry::Type::Offer, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         requests=try!(format_entries(entry::Type::Request, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))))
     ))))
 }
 
-fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, _: &mut Request) -> IronResult<Response> {
+fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, req: &mut Request) -> IronResult<Response> {
+    let is_admin = req.get::<IsAdmin>().unwrap_or(false);
+    let mut conn = try!(mysql_connection());
     Ok(Response::with((if form_error.is_some() { status::BadRequest } else { status::Ok }, "text/html".parse::<Mime>().unwrap(), format!(
         r#"
 <!DOCTYPE html>
@@ -157,6 +173,7 @@ fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, _: 
     {nav}
     <div class="container" style="position: relative; top: 71px;">
         {error_message}
+        {notices}
         <h2>{title}</h2>
         <form class="form-horizontal" action="/{url_part}/neu" method="post" enctype="application/x-www-form-urlencoded">
             <div class="form-group">
@@ -198,6 +215,7 @@ fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, _: 
         error_message=if let Some(msg) = form_error { format!(r#"<div class="alert alert-danger"><strong>{}</strong> Bitte füllen Sie das Formular erneut aus.</div>"#, msg) } else { String::default() },
         header=include_str!("../assets/header.html"),
         nav=include_str!("../assets/nav.html"),
+        notices=try!(format_notices(Some(entry_type), &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         title=entry_type.map("Neues Angebot", "Neue Anfrage"),
         url_part=entry_type.url_part(),
         article=entry_type.german_article(),
