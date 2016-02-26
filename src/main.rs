@@ -184,7 +184,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
         "#,
         header=include_str!("../assets/header.html"),
         intro=include_str!("../assets/intro.html"),
-        nav=include_str!("../assets/nav.html"),
+        nav=if is_admin { include_str!("../assets/nav-admin.html") } else { include_str!("../assets/nav.html") },
         notices=try!(format_notices(None, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         offers=try!(format_entries(entry::Type::Offer, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         requests=try!(format_entries(entry::Type::Request, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))))
@@ -246,7 +246,7 @@ fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, req
         "#,
         error_message=if let Some(msg) = form_error { format!(r#"<div class="alert alert-danger"><strong>{}</strong> Bitte füllen Sie das Formular erneut aus.</div>"#, msg) } else { String::default() },
         header=include_str!("../assets/header.html"),
-        nav=include_str!("../assets/nav.html"),
+        nav=if is_admin { include_str!("../assets/nav-admin.html") } else { include_str!("../assets/nav.html") },
         notices=try!(format_notices(Some(entry_type), &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         title=entry_type.map("Neues Angebot", "Neue Anfrage"),
         url_part=entry_type.url_part(),
