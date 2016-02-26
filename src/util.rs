@@ -5,8 +5,6 @@ use iron::prelude::*;
 use iron::{headers, status};
 use iron::typemap::TypeMap;
 
-use mysql::conn::MyOpts;
-
 use rustc_serialize::json;
 
 #[derive(RustcDecodable)]
@@ -25,7 +23,7 @@ pub struct Config {
 
 lazy_static! {
     pub static ref CONFIG: Config = json::decode(include_str!("../assets/config.json")).unwrap();
-    pub static ref MY_OPTS: MyOpts = MyOpts {
+    pub static ref MY_OPTS: ::mysql::Opts = ::mysql::Opts {
         user: Some("wiw".to_string()),
         pass: Some(CONFIG.mysql.password.clone()),
         db_name: Some("wiwboerse".to_string()),

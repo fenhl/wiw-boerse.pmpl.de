@@ -19,9 +19,7 @@ use iron::status;
 use iron::prelude::*;
 use iron::mime::Mime;
 
-use mysql::conn::MyConn;
-use mysql::error::MyError;
-use mysql::value::FromValue;
+use mysql::FromValue;
 
 use regex::Regex;
 
@@ -72,11 +70,11 @@ fn mysql_escape_nullable<S: AsRef<str>>(s: S) -> String {
     }
 }
 
-fn mysql_connection() -> IronResult<MyConn> {
-    MyConn::new(MY_OPTS.clone()).map_err(|_| IronError::new(DbError, (status::InternalServerError, "Konnte die Datenbank nicht laden. Bitte kontaktieren Sie die Administration.")))
+fn mysql_connection() -> IronResult<::mysql::Conn> {
+    ::mysql::Conn::new(MY_OPTS.clone()).map_err(|_| IronError::new(DbError, (status::InternalServerError, "Konnte die Datenbank nicht laden. Bitte kontaktieren Sie die Administration.")))
 }
 
-fn format_notices(entry_type: Option<entry::Type>, conn: &mut mysql::conn::MyConn, is_admin: bool) -> Result<String, MyError> {
+fn format_notices(entry_type: Option<entry::Type>, conn: &mut ::mysql::Conn, is_admin: bool) -> Result<String, ::mysql::Error> {
     let entries = try!(conn.query("SELECT * FROM notices")).collect::<Vec<_>>();
     Ok(entries.into_iter().filter_map(|row| match row {
         Ok(values) => {
@@ -94,7 +92,7 @@ fn format_notices(entry_type: Option<entry::Type>, conn: &mut mysql::conn::MyCon
     }).collect())
 }
 
-fn format_entries(entry_type: entry::Type, conn: &mut mysql::conn::MyConn, is_admin: bool) -> Result<String, MyError> {
+fn format_entries(entry_type: entry::Type, conn: &mut ::mysql::Conn, is_admin: bool) -> Result<String, ::mysql::Error> {
     let entries = try!(conn.query(format!("SELECT * FROM {}", entry_type.table()))).collect::<Vec<_>>();
     Ok(if entries.len() > 0 {
         entries.into_iter().map(|row| match row {
