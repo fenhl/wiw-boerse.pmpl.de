@@ -34,6 +34,32 @@ use urlencoded::UrlEncodedBody;
 use admin::IsAdmin;
 use util::{DbError, InternalError, MY_OPTS, Nyi, check_admin_auth, check_auth};
 
+struct NoticePositions {
+    index: bool,
+    create_offer: bool,
+    create_request: bool
+}
+
+impl NoticePositions {
+    fn contains(&self, pos: Option<entry::Type>) -> bool {
+        match pos {
+            Some(entry::Type::Offer) => self.create_offer,
+            Some(entry::Type::Request) => self.create_request,
+            None => self.index
+        }
+    }
+}
+
+impl<S: AsRef<str>> From<S> for NoticePositions {
+    fn from(s: S) -> NoticePositions {
+        NoticePositions {
+            index: s.as_ref().contains("index"),
+            create_offer: s.as_ref().contains("create_offer"),
+            create_request: s.as_ref().contains("create_request")
+        }
+    }
+}
+
 fn mysql_escape<S: AsRef<str>>(s: S) -> String {
     format!("\"{}\"", Regex::new("\0|\n|\r|\\|'|\"|\x1a").unwrap().replace_all(s.as_ref(), "\\$0"))
 }
@@ -53,10 +79,16 @@ fn mysql_connection() -> IronResult<MyConn> {
 fn format_notices(entry_type: Option<entry::Type>, conn: &mut mysql::conn::MyConn, is_admin: bool) -> Result<String, MyError> {
     let entries = try!(conn.query("SELECT * FROM notices")).collect::<Vec<_>>();
     Ok(entries.into_iter().filter_map(|row| match row {
-        //TODO filter by message position
         Ok(values) => {
-            //TODO show delete button if is_admin
-            Some(format!(r#"<div class="alert alert-info">{}</div>"#, String::from_value(values[2].clone())))
+            if NoticePositions::from(String::from_value(values[1].clone())).contains(entry_type) {
+                Some(format!(
+                    r#"<div class="alert alert-info">{edit_buttons}{text}</div>"#,
+                    text=String::from_value(values[2].clone()),
+                    edit_buttons=if is_admin { format!(r#"<div style="float: right;"><a href="/notiz/{}/loeschen" class="btn btn-danger"><i class="fa fa-trash-o"></i></a></div>"#, i32::from_value(values[0].clone())) } else { "".to_owned() }
+                ))
+            } else {
+                None
+            }
         }
         Err(_) => Some(r#"<div class="alert alert-danger"><strong>Fehlerhafte Nachricht.</strong></div>"#.to_owned())
     }).collect())
