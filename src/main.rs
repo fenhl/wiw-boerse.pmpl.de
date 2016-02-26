@@ -437,22 +437,15 @@ fn main() {
     router.get("/biete/neu", new_offer_page);
     router.post("/biete/neu", add_offer);
     router.get("/biete/:id", nyi_handler);
+    router.get("/biete/:id/loeschen", { let mut c = Chain::new(del_offer); c.link_before(check_admin_auth); c });
+    router.get("/notiz/neu", { let mut c = Chain::new(new_notice_page); c.link_before(check_admin_auth); c });
+    router.post("/notiz/neu", { let mut c = Chain::new(add_notice); c.link_before(check_admin_auth); c });
+    router.get("/notiz/:id", nyi_handler);
+    router.get("/notiz/:id/loeschen", { let mut c = Chain::new(del_notice); c.link_before(check_admin_auth); c });
     router.get("/suche/neu", new_request_page);
     router.post("/suche/neu", add_request);
     router.get("/suche/:id", nyi_handler);
-    router.get("/notiz/neu", new_notice_page);
-    router.post("/notiz/neu", add_notice);
-    router.get("/notiz/:id", nyi_handler);
-    // handle admin auth
-    let mut del_request_chain = Chain::new(del_request);
-    del_request_chain.link_before(check_admin_auth);
-    router.get("/suche/:id/loeschen", del_request_chain);
-    let mut del_offer_chain = Chain::new(del_offer);
-    del_offer_chain.link_before(check_admin_auth);
-    router.get("/biete/:id/loeschen", del_offer_chain);
-    let mut del_notice_chain = Chain::new(del_notice);
-    del_notice_chain.link_before(check_admin_auth);
-    router.get("/notiz/:id/loeschen", del_notice_chain);
+    router.get("/suche/:id/loeschen", { let mut c = Chain::new(del_request); c.link_before(check_admin_auth); c });
     // handle auth
     let mut chain = Chain::new(router);
     chain.link_before(check_auth);
