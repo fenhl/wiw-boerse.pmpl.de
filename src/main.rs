@@ -39,12 +39,24 @@ struct NoticePositions {
 }
 
 impl NoticePositions {
+    fn any(&self) -> bool {
+        self.index || self.create_offer || self.create_request
+    }
+
     fn contains(&self, pos: Option<entry::Type>) -> bool {
         match pos {
             Some(entry::Type::Offer) => self.create_offer,
             Some(entry::Type::Request) => self.create_request,
             None => self.index
         }
+    }
+
+    fn mysql_string(&self) -> String {
+        let mut position_strings = Vec::default();
+        if self.index { position_strings.push("index"); }
+        if self.create_offer { position_strings.push("create_offer"); }
+        if self.create_request { position_strings.push("create_request"); }
+        position_strings.join(",")
     }
 }
 
@@ -189,6 +201,63 @@ fn index(req: &mut Request) -> IronResult<Response> {
     ))))
 }
 
+fn new_notice_page_inner(form_error: Option<&'static str>, _: &mut Request) -> IronResult<Response> {
+    Ok(Response::with((if form_error.is_some() { status::BadRequest } else { status::Ok }, "text/html".parse::<Mime>().unwrap(), format!(
+        r#"
+<!DOCTYPE html>
+<html>
+<head>
+    {header}
+</head>
+<body>
+    {nav}
+    <div class="container" style="position: relative; top: 71px;">
+        {error_message}
+        <h2>Neue Notiz</h2>
+        <form class="form-horizontal" action="/notiz/neu" method="post" enctype="application/x-www-form-urlencoded">
+            <div class="form-group">
+                <label for="text" class="col-sm-2 control-label">Text</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" name="text" id="text" placeholder="Inhalt der Notiz" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="position" class="col-sm-2 control-label">Anzeigen auf</label>
+                <div class="col-sm-10">
+                    <div class="checkbox">
+                        <label>
+                            <input type="checkbox" name="position-index" /> Börsen-Hauptseite
+                        </label>
+                    </div>
+                    <div class="checkbox">
+                        <label>
+                            <input type="checkbox" name="position-create-offer" /> Formular „neues Angebot“
+                        </label>
+                    </div>
+                    <div class="checkbox">
+                        <label>
+                            <input type="checkbox" name="position-create-request" /> Formular „neue Anfrage“
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                    <a href="/" style="float: right;" class="btn btn-danger">Abbrechen</a>
+                    <button type="submit" class="btn btn-primary">Notiz veröffentlichen</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
+        "#,
+        error_message=if let Some(msg) = form_error { format!(r#"<div class="alert alert-danger"><strong>{}</strong> Bitte füllen Sie das Formular erneut aus.</div>"#, msg) } else { String::default() },
+        header=include_str!("../assets/header.html"),
+        nav=include_str!("../assets/nav-admin.html")
+    ))))
+}
+
 fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, req: &mut Request) -> IronResult<Response> {
     let is_admin = req.get::<IsAdmin>().unwrap_or(false);
     let mut conn = try!(mysql_connection());
@@ -261,6 +330,35 @@ fn new_request_page(req: &mut Request) -> IronResult<Response> {
     new_entry_page(entry::Type::Request, None, req)
 }
 
+fn new_notice_page(req: &mut Request) -> IronResult<Response> {
+    new_notice_page_inner(None, req)
+}
+
+fn add_notice_inner(req: &mut Request) -> Result<Response, &'static str> {
+    let form_data = try!(req.get_ref::<UrlEncodedBody>().map_err(|_| "Fehlender Formularinhalt."));
+    let text = mysql_escape_nullable(&form_data["text"][0]);
+    if text == "NULL" { return Err("Fehlender Text."); }
+    let positions = NoticePositions {
+        index: form_data.contains_key("position-index"),
+        create_offer: form_data.contains_key("position-create-offer"),
+        create_request: form_data.contains_key("position-create-request")
+    };
+    if !positions.any() { return Err("Bitte geben Sie mindestens eine Position an, wo die Notiz angezeigt werden soll."); }
+    let position_str = mysql_escape_nullable(positions.mysql_string());
+    let mut conn = try!(mysql_connection().map_err(|_| "Fehler beim Zugriff auf die Datenbank."));
+    try!(conn.query(format!("INSERT INTO notices (position, text) VALUES ({}, {})", position_str, text)).map_err(|_| "Fehler beim Zugriff auf die Datenbank."));
+    Ok(Response::with((status::Ok, "text/html".parse::<Mime>().unwrap(),
+        r#"
+<!DOCTYPE html>
+<html>
+    <body>
+        <p>Die Notiz wurde veröffentlicht.</p>
+    </body>
+</html>
+        "#
+    ))) //TODO full HTML page with link to indexs
+}
+
 fn add_entry(entry_type: entry::Type, req: &mut Request) -> Result<Response, &'static str> {
     let form_data = try!(req.get_ref::<UrlEncodedBody>().map_err(|_| "Fehlender Formularinhalt."));
     let name = mysql_escape_nullable(&form_data["name"][0]);
@@ -293,6 +391,10 @@ fn add_request(req: &mut Request) -> IronResult<Response> {
     add_entry(entry::Type::Request, req).or_else(|e| new_entry_page(entry::Type::Request, Some(e), req))
 }
 
+fn add_notice(req: &mut Request) -> IronResult<Response> {
+    add_notice_inner(req).or_else(|e| new_notice_page_inner(Some(e), req))
+}
+
 fn del_entry(entry_type: entry::Type, req: &mut Request) -> IronResult<Response> {
     let mut conn = try!(mysql_connection());
     let err_msg = format!("Fehler beim Lesen der {}nummer.", entry_type.map("Angebots", "Anfragen"));
@@ -308,6 +410,15 @@ fn del_offer(req: &mut Request) -> IronResult<Response> {
 
 fn del_request(req: &mut Request) -> IronResult<Response> {
     del_entry(entry::Type::Request, req)
+}
+
+fn del_notice(req: &mut Request) -> IronResult<Response> {
+    let mut conn = try!(mysql_connection());
+    let err_msg = "Fehler beim Lesen der Notiznummer.";
+    let id_str = try!(try!(req.extensions.get::<Router>().ok_or(IronError::new(InternalError, (status::InternalServerError, err_msg)))).find("id").ok_or(IronError::new(InternalError, (status::InternalServerError, err_msg))));
+    let id = try!(i32::from_str(id_str).map_err(|e| IronError::new(e, (status::BadRequest, format!("Die Notiznummer {:?} ist keine Nummer.", id_str)))));
+    try!(conn.query(format!("DELETE FROM notices WHERE id={}", id)).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank."))));
+    Ok(Response::with((status::Ok, "Die Notiz wurde gelöscht.")))
 }
 
 fn nyi() -> IronError {
@@ -329,6 +440,9 @@ fn main() {
     router.get("/suche/neu", new_request_page);
     router.post("/suche/neu", add_request);
     router.get("/suche/:id", nyi_handler);
+    router.get("/notiz/neu", new_notice_page);
+    router.post("/notiz/neu", add_notice);
+    router.get("/notiz/:id", nyi_handler);
     // handle admin auth
     let mut del_request_chain = Chain::new(del_request);
     del_request_chain.link_before(check_admin_auth);
@@ -336,6 +450,9 @@ fn main() {
     let mut del_offer_chain = Chain::new(del_offer);
     del_offer_chain.link_before(check_admin_auth);
     router.get("/biete/:id/loeschen", del_offer_chain);
+    let mut del_notice_chain = Chain::new(del_notice);
+    del_notice_chain.link_before(check_admin_auth);
+    router.get("/notiz/:id/loeschen", del_notice_chain);
     // handle auth
     let mut chain = Chain::new(router);
     chain.link_before(check_auth);
