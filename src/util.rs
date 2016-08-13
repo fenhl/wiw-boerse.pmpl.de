@@ -23,11 +23,12 @@ pub struct Config {
 
 lazy_static! {
     pub static ref CONFIG: Config = json::decode(include_str!("../assets/config.json")).unwrap();
-    pub static ref MY_OPTS: ::mysql::Opts = ::mysql::Opts {
-        user: Some("wiw".to_string()),
-        pass: Some(CONFIG.mysql.password.clone()),
-        db_name: Some("wiwboerse".to_string()),
-        ..Default::default()
+    pub static ref MY_OPTS: ::mysql::Opts = {
+        let mut builder = ::mysql::OptsBuilder::new();
+        builder.user(Some("wiw"))
+            .pass(Some(CONFIG.mysql.password.clone()))
+            .db_name(Some("wiwboerse"));
+        builder.into()
     };
 }
 

@@ -7,6 +7,7 @@ extern crate router;
 extern crate rustc_serialize as rustc_serialize;
 extern crate staticfile;
 extern crate urlencoded;
+extern crate wiw;
 
 mod admin;
 mod entry;
@@ -195,7 +196,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
         "#,
         header=include_str!("../assets/header.html"),
         intro=include_str!("../assets/intro.html"),
-        nav=if is_admin { include_str!("../assets/nav-admin.html") } else { include_str!("../assets/nav.html") },
+        nav=wiw::nav("boerse", "/", is_admin),
         notices=try!(format_notices(None, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         offers=try!(format_entries(entry::Type::Offer, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         requests=try!(format_entries(entry::Type::Request, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
