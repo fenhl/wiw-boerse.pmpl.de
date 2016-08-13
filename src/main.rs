@@ -204,7 +204,8 @@ fn index(req: &mut Request) -> IronResult<Response> {
     ))))
 }
 
-fn new_notice_page_inner(form_error: Option<&'static str>, _: &mut Request) -> IronResult<Response> {
+fn new_notice_page_inner(form_error: Option<&'static str>, req: &mut Request) -> IronResult<Response> {
+    let is_admin = req.get::<IsAdmin>().unwrap_or(false);
     Ok(Response::with((if form_error.is_some() { status::BadRequest } else { status::Ok }, "text/html".parse::<Mime>().unwrap(), format!(
         r#"
 <!DOCTYPE html>
@@ -258,7 +259,7 @@ fn new_notice_page_inner(form_error: Option<&'static str>, _: &mut Request) -> I
         "#,
         error_message=if let Some(msg) = form_error { format!(r#"<div class="alert alert-danger"><strong>{}</strong> Bitte füllen Sie das Formular erneut aus.</div>"#, msg) } else { String::default() },
         header=include_str!("../assets/header.html"),
-        nav=include_str!("../assets/nav-admin.html"),
+        nav=wiw::nav("boerse", "/notiz/neu", is_admin),
         footer=include_str!("../assets/footer.html")
     ))))
 }
@@ -319,7 +320,7 @@ fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, req
         "#,
         error_message=if let Some(msg) = form_error { format!(r#"<div class="alert alert-danger"><strong>{}</strong> Bitte füllen Sie das Formular erneut aus.</div>"#, msg) } else { String::default() },
         header=include_str!("../assets/header.html"),
-        nav=if is_admin { include_str!("../assets/nav-admin.html") } else { include_str!("../assets/nav.html") },
+        nav=wiw::nav("boerse", &format!("/{}/neu", entry_type.url_part())[..], is_admin),
         notices=try!(format_notices(Some(entry_type), &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         title=entry_type.map("Neues Angebot", "Neue Anfrage"),
         url_part=entry_type.url_part(),
