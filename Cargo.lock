@@ -639,5 +639,5 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "wiw"
 version = "0.0.1"
-source = "git+https://github.com/fenhl/wiw-web-common.git#c19732759af5d34db9296a6d506e0e6744f47e77"
+source = "git+https://github.com/fenhl/wiw-web-common.git#5062cc9a7e9a547d7bb958a5bbb38b305559bfe0"
 
