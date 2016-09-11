@@ -3,7 +3,7 @@ extern crate iron;
 extern crate mysql;
 extern crate plugin;
 extern crate regex;
-extern crate router;
+#[macro_use] extern crate router;
 extern crate rustc_serialize as rustc_serialize;
 extern crate staticfile;
 extern crate urlencoded;
@@ -31,7 +31,7 @@ use staticfile::Static;
 use urlencoded::UrlEncodedBody;
 
 use admin::IsAdmin;
-use util::{DbError, InternalError, MY_OPTS, Nyi, check_admin_auth, check_auth};
+use util::{DbError, InternalError, IsTls, MY_OPTS, Nyi, check_admin_auth, check_auth};
 
 struct NoticePositions {
     index: bool,
@@ -155,6 +155,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
     <body>
         {nav}
         <div class="container" style="position: relative; top: 71px;">
+            {tls_notice}
             {notices}
             <div class="panel panel-default">
                 {intro}
@@ -197,6 +198,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
         header=include_str!("../assets/header.html"),
         intro=include_str!("../assets/intro.html"),
         nav=wiw::nav("boerse", "/", is_admin),
+        tls_notice=if try!(req.get::<IsTls>()) { "" } else { r#"<div class="alert alert-warning">Sie benutzen die unverschlüsselte Version der Börse. <a href="https://boerse.willkommeninwoellstein.de/">Zur verschlüsselten Version wechseln</a></div>"# },
         notices=try!(format_notices(None, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         offers=try!(format_entries(entry::Type::Offer, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         requests=try!(format_entries(entry::Type::Request, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
@@ -439,21 +441,22 @@ fn nyi_handler(_: &mut Request) -> IronResult<Response> {
 
 fn main() {
     // route
-    let mut router = Router::new();
-    router.get("/", index);
-    router.get("/static", Static::new(Path::new("static")));
-    router.get("/biete/neu", new_offer_page);
-    router.post("/biete/neu", add_offer);
-    router.get("/biete/:id", nyi_handler);
-    router.get("/biete/:id/loeschen", { let mut c = Chain::new(del_offer); c.link_before(check_admin_auth); c });
-    router.get("/notiz/neu", { let mut c = Chain::new(new_notice_page); c.link_before(check_admin_auth); c });
-    router.post("/notiz/neu", { let mut c = Chain::new(add_notice); c.link_before(check_admin_auth); c });
-    router.get("/notiz/:id", nyi_handler);
-    router.get("/notiz/:id/loeschen", { let mut c = Chain::new(del_notice); c.link_before(check_admin_auth); c });
-    router.get("/suche/neu", new_request_page);
-    router.post("/suche/neu", add_request);
-    router.get("/suche/:id", nyi_handler);
-    router.get("/suche/:id/loeschen", { let mut c = Chain::new(del_request); c.link_before(check_admin_auth); c });
+    let router = router! {
+        index: get "/" => index,
+        static: get "/static" => Static::new(Path::new("static")),
+        new_offer_page: get "/biete/neu" => new_offer_page,
+        add_offer: post "/biete/neu" => add_offer,
+        offer_page: get "/biete/:id" => nyi_handler,
+        delete_offer: get "/biete/:id/loeschen" => { let mut c = Chain::new(del_offer); c.link_before(check_admin_auth); c },
+        new_notice_page: get "/notiz/neu" => { let mut c = Chain::new(new_notice_page); c.link_before(check_admin_auth); c },
+        add_notice: post "/notiz/neu" => { let mut c = Chain::new(add_notice); c.link_before(check_admin_auth); c },
+        notice_page: get "/notiz/:id" => nyi_handler,
+        delete_notice: get "/notiz/:id/loeschen" => { let mut c = Chain::new(del_notice); c.link_before(check_admin_auth); c },
+        new_request_page: get "/suche/neu" => new_request_page,
+        add_request: post "/suche/neu" => add_request,
+        request_page: get "/suche/:id" => nyi_handler,
+        delete_request: get "/suche/:id/loeschen" => { let mut c = Chain::new(del_request); c.link_before(check_admin_auth); c }
+    };
     // handle auth
     let mut chain = Chain::new(router);
     chain.link_before(check_auth);

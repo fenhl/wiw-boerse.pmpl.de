@@ -1,11 +1,40 @@
-use std::fmt;
+use std::{fmt, string};
 use std::error::Error;
 
 use iron::prelude::*;
 use iron::{headers, status};
-use iron::typemap::TypeMap;
+use iron::typemap::{Key, TypeMap};
+
+use plugin;
 
 use rustc_serialize::json;
+
+#[derive(Debug, Clone, Copy)]
+pub struct IsTls;
+
+impl Key for IsTls {
+    type Value = bool;
+}
+
+impl<'a, 'b> plugin::Plugin<Request<'a, 'b>> for IsTls {
+    type Error = IsTlsError;
+
+    fn eval(req: &mut Request) -> Result<bool, IsTlsError> {
+        Ok(match req.headers.get_raw("X-Fenhl-TLS") {
+            Some(header_bytes) => {
+                if header_bytes.len() != 1 {
+                    return Err(IsTlsError);
+                }
+                match &*try!(String::from_utf8(header_bytes[0].clone())) {
+                    "on" => true,
+                    "" => false,
+                    _ => { return Err(IsTlsError); }
+                }
+            }
+            None => false
+        })
+    }
+}
 
 #[derive(RustcDecodable)]
 pub struct ConfigMy {
@@ -91,7 +120,7 @@ pub fn check_auth(req: &mut Request) -> IronResult<()> {
 macro_rules! errors {
     ($($name:ident($msg:expr);)*) => {
         $(
-            #[derive(Debug)]
+            #[derive(Debug, Clone, Copy)]
             pub struct $name;
 
             impl fmt::Display for $name {
@@ -105,6 +134,12 @@ macro_rules! errors {
                     $msg
                 }
             }
+
+            impl From<$name> for IronError {
+                fn from(err: $name) -> IronError {
+                    IronError::new(err, (status::BadRequest, $msg))
+                }
+            }
         )*
     }
 }
@@ -113,5 +148,10 @@ errors! {
     AuthError("authentication error");
     DbError("database error");
     InternalError("internal server error");
+    IsTlsError("failed to determine encryption status");
     Nyi("not yet implemented");
+}
+
+impl From<string::FromUtf8Error> for IsTlsError {
+    fn from(_: string::FromUtf8Error) -> IsTlsError { IsTlsError }
 }
