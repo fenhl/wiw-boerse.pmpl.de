@@ -118,8 +118,8 @@ fn format_reboot_notice(utc_time: DateTime<UTC>) -> String {
     if berlin_end_time.date() != berlin_time.date() {
         return format!(
             r#"<div class="alert alert-warning">Die Börse wird zwischen {start_time} Uhr und {end_time} Uhr zeitweise nicht erreichbar sein. In diesem Zeitraum bitte keine Angebote/Anfragen einreichen, diese gehen sonst verloren.</div>"#,
-            start_time=berlin_time.format("%%d.%m.%Y %H:%M"),
-            end_time=berlin_end_time.format("%%d.%m.%Y %H:%M")
+            start_time=berlin_time.format("%d.%m.%Y %H:%M"),
+            end_time=berlin_end_time.format("%d.%m.%Y %H:%M")
         );
     }
     let now = Local::now().with_timezone(&Berlin);
