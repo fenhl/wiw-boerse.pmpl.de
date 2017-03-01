@@ -1,3 +1,5 @@
+extern crate chrono;
+extern crate chrono_tz;
 extern crate iron;
 #[macro_use] extern crate lazy_static;
 extern crate mysql;
@@ -16,11 +18,16 @@ mod util;
 use std::path::Path;
 use std::str::FromStr;
 
+use chrono::Duration;
+use chrono::prelude::*;
+
+use chrono_tz::Europe::Berlin;
+
 use iron::status;
 use iron::prelude::*;
 use iron::mime::Mime;
 
-use mysql::FromValue;
+use mysql::prelude::*;
 
 use regex::Regex;
 
@@ -88,8 +95,8 @@ fn mysql_connection() -> IronResult<::mysql::Conn> {
 }
 
 fn format_notices(entry_type: Option<entry::Type>, conn: &mut ::mysql::Conn, is_admin: bool) -> Result<String, ::mysql::Error> {
-    let entries = try!(conn.query("SELECT * FROM notices")).collect::<Vec<_>>();
-    Ok(entries.into_iter().filter_map(|row| match row {
+    let entries = try!(conn.query("SELECT * FROM notices"));
+    Ok(entries.filter_map(|row| match row {
         Ok(values) => {
             if NoticePositions::from(String::from_value(values[1].clone())).contains(entry_type) {
                 Some(format!(
@@ -103,6 +110,17 @@ fn format_notices(entry_type: Option<entry::Type>, conn: &mut ::mysql::Conn, is_
         }
         Err(_) => Some(r#"<div class="alert alert-danger"><strong>Fehlerhafte Nachricht.</strong></div>"#.to_owned())
     }).collect())
+}
+
+fn format_reboot_notice(utc_time: DateTime<UTC>) -> String {
+    let berlin_time = utc_time.with_timezone(&Berlin);
+    let berlin_end_time = berlin_time + Duration::minutes(15);
+    format!(
+        r#"<div class="alert alert-warning>Die Börse wird {date} zwischen {start_time} Uhr und {end_time} Uhr zeitweise nicht erreichbar sein. In diesem Zeitraum bitte keine Angebote/Anfragen einreichen, diese gehen sonst verloren.</div>"#,
+        date=format!("am {}", berlin_time.format("%d.%m.%Y")),
+        start_time=berlin_time.format("%H:%M"),
+        end_time=berlin_end_time.format("%H:%M")
+    )
 }
 
 fn format_entries(entry_type: entry::Type, conn: &mut ::mysql::Conn, is_admin: bool) -> Result<String, ::mysql::Error> {
@@ -155,6 +173,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
     <body>
         {nav}
         <div class="container" style="position: relative; top: 71px;">
+            {reboot_notice}
             {tls_notice}
             {notices}
             <div class="panel panel-default">
@@ -198,6 +217,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
         header=include_str!("../assets/header.html"),
         intro=include_str!("../assets/intro.html"),
         nav=wiw::nav("boerse", "/", is_admin),
+        reboot_notice=if let Some(utc_time) = util::reboot_time() { format_reboot_notice(utc_time) } else { String::default() },
         tls_notice=if try!(req.get::<IsTls>()) { "" } else { r#"<div class="alert alert-warning">Sie benutzen die unverschlüsselte Version der Börse. <a href="https://boerse.willkommeninwoellstein.de/">Zur verschlüsselten Version wechseln</a></div>"# },
         notices=try!(format_notices(None, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         offers=try!(format_entries(entry::Type::Offer, &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
@@ -280,6 +300,7 @@ fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, req
     {nav}
     <div class="container" style="position: relative; top: 71px;">
         {error_message}
+        {reboot_notice}
         {notices}
         <h2>{title}</h2>
         <form class="form-horizontal" action="/{url_part}/neu" method="post" enctype="application/x-www-form-urlencoded">
@@ -323,6 +344,7 @@ fn new_entry_page(entry_type: entry::Type, form_error: Option<&'static str>, req
         error_message=if let Some(msg) = form_error { format!(r#"<div class="alert alert-danger"><strong>{}</strong> Bitte füllen Sie das Formular erneut aus.</div>"#, msg) } else { String::default() },
         header=include_str!("../assets/header.html"),
         nav=wiw::nav("boerse", &format!("/{}/neu", entry_type.url_part())[..], is_admin),
+        reboot_notice=if let Some(utc_time) = util::reboot_time() { format_reboot_notice(utc_time) } else { String::default() },
         notices=try!(format_notices(Some(entry_type), &mut conn, is_admin).map_err(|e| IronError::new(e, (status::InternalServerError, "Fehler beim Zugriff auf die Datenbank.")))),
         title=entry_type.map("Neues Angebot", "Neue Anfrage"),
         url_part=entry_type.url_part(),

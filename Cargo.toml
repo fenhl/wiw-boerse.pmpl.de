@@ -11,6 +11,7 @@ test = false
 bench = false
 
 [dependencies]
+chrono-tz = "*"
 iron = "*"
 lazy_static = "*"
 mysql = "*"
@@ -20,6 +21,10 @@ router = "*"
 rustc-serialize = "*"
 staticfile = "*"
 urlencoded = "*"
+
+[dependencies.chrono]
+version = "*"
+features = ["rustc-serialize"]
 
 [dependencies.wiw]
 git = "https://github.com/fenhl/wiw-web-common.git"

@@ -1,5 +1,9 @@
 use std::{fmt, string};
 use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+
+use chrono::prelude::*;
 
 use iron::prelude::*;
 use iron::{headers, status};
@@ -48,6 +52,11 @@ pub struct Config {
     admin_name: String,
     admin_pass: String,
     mysql: ConfigMy
+}
+
+#[derive(RustcDecodable)]
+struct RebootConfig {
+    schedule: Option<DateTime<UTC>>
 }
 
 lazy_static! {
@@ -114,6 +123,22 @@ pub fn check_auth(req: &mut Request) -> IronResult<()> {
                 }
             })
         }
+    }
+}
+
+pub fn reboot_time() -> Option<DateTime<UTC>> {
+    if let Ok(mut f) = File::open("/opt/dev/reboot.json") {
+        let mut config_buf = String::default();
+        if f.read_to_string(&mut config_buf).is_err() {
+            return None;
+        }
+        if let Ok(conf) = json::decode::<RebootConfig>(&config_buf) {
+            conf.schedule
+        } else {
+            None
+        }
+    } else {
+        None
     }
 }
 
