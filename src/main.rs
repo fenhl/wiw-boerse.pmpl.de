@@ -116,7 +116,7 @@ fn format_reboot_notice(utc_time: DateTime<UTC>) -> String {
     let berlin_time = utc_time.with_timezone(&Berlin);
     let berlin_end_time = berlin_time + Duration::minutes(15);
     format!(
-        r#"<div class="alert alert-warning>Die Börse wird {date} zwischen {start_time} Uhr und {end_time} Uhr zeitweise nicht erreichbar sein. In diesem Zeitraum bitte keine Angebote/Anfragen einreichen, diese gehen sonst verloren.</div>"#,
+        r#"<div class="alert alert-warning">Die Börse wird {date} zwischen {start_time} Uhr und {end_time} Uhr zeitweise nicht erreichbar sein. In diesem Zeitraum bitte keine Angebote/Anfragen einreichen, diese gehen sonst verloren.</div>"#,
         date=format!("am {}", berlin_time.format("%d.%m.%Y")),
         start_time=berlin_time.format("%H:%M"),
         end_time=berlin_end_time.format("%H:%M")
