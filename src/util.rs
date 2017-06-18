@@ -56,7 +56,8 @@ pub struct Config {
 
 #[derive(RustcDecodable)]
 struct RebootConfig {
-    schedule: Option<DateTime<UTC>>
+    schedule: Option<DateTime<UTC>>,
+    upgrade: bool
 }
 
 lazy_static! {
@@ -126,14 +127,14 @@ pub fn check_auth(req: &mut Request) -> IronResult<()> {
     }
 }
 
-pub fn reboot_time() -> Option<DateTime<UTC>> {
+pub fn reboot_time() -> Option<(DateTime<UTC>, bool)> {
     if let Ok(mut f) = File::open("/opt/dev/reboot.json") {
         let mut config_buf = String::default();
         if f.read_to_string(&mut config_buf).is_err() {
             return None;
         }
         if let Ok(conf) = json::decode::<RebootConfig>(&config_buf) {
-            conf.schedule
+            conf.schedule.map(|sched| (sched, conf.upgrade))
         } else {
             None
         }
