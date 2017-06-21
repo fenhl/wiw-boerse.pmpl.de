@@ -11,7 +11,7 @@ use iron::typemap::{Key, TypeMap};
 
 use plugin;
 
-use rustc_serialize::json;
+use serde_json;
 
 #[derive(Debug, Clone, Copy)]
 pub struct IsTls;
@@ -40,12 +40,14 @@ impl<'a, 'b> plugin::Plugin<Request<'a, 'b>> for IsTls {
     }
 }
 
-#[derive(RustcDecodable)]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigMy {
     password: String
 }
 
-#[derive(RustcDecodable)]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     username: String,
     password: String,
@@ -54,14 +56,16 @@ pub struct Config {
     mysql: ConfigMy
 }
 
-#[derive(RustcDecodable)]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RebootConfig {
     schedule: Option<DateTime<UTC>>,
+    #[serde(default)]
     upgrade: bool
 }
 
 lazy_static! {
-    pub static ref CONFIG: Config = json::decode(include_str!("../assets/config.json")).unwrap();
+    pub static ref CONFIG: Config = serde_json::from_str(include_str!("../assets/config.json")).unwrap();
     pub static ref MY_OPTS: ::mysql::Opts = {
         let mut builder = ::mysql::OptsBuilder::new();
         builder.user(Some("wiw"))
@@ -133,7 +137,7 @@ pub fn reboot_time() -> Option<(DateTime<UTC>, bool)> {
         if f.read_to_string(&mut config_buf).is_err() {
             return None;
         }
-        if let Ok(conf) = json::decode::<RebootConfig>(&config_buf) {
+        if let Ok(conf) = serde_json::from_str::<RebootConfig>(&config_buf) {
             conf.schedule.map(|sched| (sched, conf.upgrade))
         } else {
             None
